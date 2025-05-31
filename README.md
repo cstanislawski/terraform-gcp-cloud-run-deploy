@@ -4,6 +4,19 @@ A Terraform module to deploy a Cloud Run Service using a Kubernetes-like syntax.
 
 This module provides a Kubernetes-like interface for deploying Cloud Run services, making it easier for teams familiar with Kubernetes to adopt Cloud Run.
 
+## Why use this?
+
+If you're coming from Kubernetes and want to deploy to Cloud Run, this module bridges the gap by providing:
+
+- **Familiar syntax** - Use the same `metadata`, `spec`, and `template` structures you know from Kubernetes
+- **Smooth migration path** - Existing Kubernetes YAML manifests can be adapted with minimal changes
+- **Reduced learning curve** - No need to learn Cloud Run-specific Terraform syntax from scratch
+- **Manifest-driven deployments** - Keep your configuration in version-controlled YAML files
+- **Environment flexibility** - Use the same manifest across environments with parameter overrides
+- **Team consistency** - Standardize deployments using familiar Kubernetes patterns
+
+Instead of learning Cloud Run's native Terraform syntax, you can leverage your existing Kubernetes knowledge while still getting all the benefits of Cloud Run's serverless platform.
+
 ## Features
 
 - **Kubernetes-like syntax** - Use familiar `metadata`, `spec`, and `template` structures
