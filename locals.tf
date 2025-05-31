@@ -36,29 +36,29 @@ locals {
   normalize_container = { for container in concat(
     try(local.manifest_template.spec.containers, []),
     try(var.template.spec.containers, [])
-  ) : container.name => {
-    name         = container.name
-    image        = try(container.image, null)
-    command      = try(container.command, null)
-    args         = try(container.args, null)
-    workingDir   = try(container.workingDir, null)
-    env          = try(container.env, null)
-    resources    = try(container.resources, null) != null ? {
-      limits = try(container.resources.limits, {})
-      cpuIdle = try(container.resources.cpuIdle, null)
+    ) : container.name => {
+    name       = container.name
+    image      = try(container.image, null)
+    command    = try(container.command, null)
+    args       = try(container.args, null)
+    workingDir = try(container.workingDir, null)
+    env        = try(container.env, null)
+    resources = try(container.resources, null) != null ? {
+      limits          = try(container.resources.limits, {})
+      cpuIdle         = try(container.resources.cpuIdle, null)
       startupCpuBoost = try(container.resources.startupCpuBoost, null)
     } : null
-    ports           = try(container.ports, null) != null ? [
+    ports = try(container.ports, null) != null ? [
       for port in container.ports : {
         name          = try(port.name, null)
         containerPort = port.containerPort
       }
     ] : null
-    volumeMounts    = try(container.volumeMounts, null)
-    startupProbe    = try(container.startupProbe, null)
-    livenessProbe   = try(container.livenessProbe, null)
-    readinessProbe  = try(container.readinessProbe, null)
-  }}
+    volumeMounts   = try(container.volumeMounts, null)
+    startupProbe   = try(container.startupProbe, null)
+    livenessProbe  = try(container.livenessProbe, null)
+    readinessProbe = try(container.readinessProbe, null)
+  } }
 
   # Get containers from manifest and module
   manifest_containers = try(local.manifest_template.spec.containers, [])
@@ -68,7 +68,7 @@ locals {
   # Use normalized containers
   merged_containers = length(local.module_containers) > 0 ? [
     for container_name, container in local.normalize_container : container
-  ] : [
+    ] : [
     for container_name, container in local.normalize_container : container
   ]
 
@@ -99,11 +99,11 @@ locals {
       percent  = try(traffic_rule.percent, 100)
       tag      = try(traffic_rule.tag, null)
     }
-  ] : [{
-    type     = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
-    revision = null
-    percent  = 100
-    tag      = null
+    ] : [{
+      type     = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+      revision = null
+      percent  = 100
+      tag      = null
   }]
 
   # Ingress configuration (only from module variables)

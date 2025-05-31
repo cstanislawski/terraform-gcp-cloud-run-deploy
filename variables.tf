@@ -260,3 +260,9 @@ variable "launch_stage" {
     error_message = "Launch stage must be one of: UNIMPLEMENTED, PRELAUNCH, EARLY_ACCESS, ALPHA, BETA, GA, DEPRECATED."
   }
 }
+
+variable "invoker_iam_disabled" {
+  type        = bool
+  description = "Whether to disable IAM for the invoker. Defaults to false."
+  default     = false
+}

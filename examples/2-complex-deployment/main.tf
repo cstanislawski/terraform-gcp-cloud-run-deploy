@@ -4,6 +4,8 @@ module "complex_app_deployment" {
 
   manifest_path = "./deployment.yaml"
 
+  deletion_protection = false
+
   # Override for staging environment
   metadata = {
     name     = "complex-app-staging"

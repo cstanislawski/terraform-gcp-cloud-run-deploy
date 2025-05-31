@@ -4,14 +4,15 @@ resource "google_cloud_run_v2_service" "cloudrun_service" {
   project  = local.final_metadata.project
 
   # Additional service parameters
-  deletion_protection = var.deletion_protection
-  description         = var.description
-  client              = var.client
-  client_version      = var.client_version
-  launch_stage        = var.launch_stage
+  deletion_protection  = var.deletion_protection
+  description          = var.description
+  client               = var.client
+  client_version       = var.client_version
+  launch_stage         = var.launch_stage
+  invoker_iam_disabled = var.invoker_iam_disabled
 
   template {
-    labels = local.final_template.metadata.labels
+    labels      = local.final_template.metadata.labels
     annotations = local.final_template.metadata.annotations
 
     scaling {
