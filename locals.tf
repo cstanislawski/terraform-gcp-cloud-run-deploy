@@ -33,10 +33,8 @@ locals {
   }
 
   # Normalize containers to ensure all have expected attributes
-  normalize_container = { for container in concat(
-    try(local.manifest_template.spec.containers, []),
-    try(var.template.spec.containers, [])
-    ) : container.name => {
+  # First normalize manifest containers
+  manifest_containers_normalized = { for container in try(local.manifest_template.spec.containers, []) : container.name => {
     name       = container.name
     image      = try(container.image, null)
     command    = try(container.command, null)
@@ -44,9 +42,98 @@ locals {
     workingDir = try(container.workingDir, null)
     env        = try(container.env, null)
     resources = try(container.resources, null) != null ? {
-      limits          = try(container.resources.limits, {})
-      cpuIdle         = try(container.resources.cpuIdle, null)
-      startupCpuBoost = try(container.resources.startupCpuBoost, null)
+      limits = {
+        cpu    = try(container.resources.limits.cpu, "1000m")
+        memory = try(container.resources.limits.memory, "512Mi")
+      }
+      cpuIdle         = try(container.resources.cpuIdle, true)
+      startupCpuBoost = try(container.resources.startupCpuBoost, false)
+    } : {
+      limits = {
+        cpu    = "1000m"
+        memory = "512Mi"
+      }
+      cpuIdle         = true
+      startupCpuBoost = false
+    }
+    ports = try(container.ports, null) != null ? [
+      for port in container.ports : {
+        name          = try(port.name, null)
+        containerPort = port.containerPort
+      }
+    ] : null
+    volumeMounts   = try(container.volumeMounts, null)
+    startupProbe = try(container.startupProbe, null) != null ? {
+      initialDelaySeconds = try(container.startupProbe.initialDelaySeconds, 0)
+      timeoutSeconds      = try(container.startupProbe.timeoutSeconds, 1)
+      periodSeconds       = try(container.startupProbe.periodSeconds, 10)
+      failureThreshold    = try(container.startupProbe.failureThreshold, 3)
+      httpGet = try(container.startupProbe.httpGet, null) != null ? {
+        path        = try(container.startupProbe.httpGet.path, "/")
+        port        = try(container.startupProbe.httpGet.port, 8080)
+        httpHeaders = try(container.startupProbe.httpGet.httpHeaders, null)
+      } : null
+      tcpSocket = try(container.startupProbe.tcpSocket, null) != null ? {
+        port = try(container.startupProbe.tcpSocket.port, 8080)
+      } : null
+      grpc = try(container.startupProbe.grpc, null) != null ? {
+        port    = try(container.startupProbe.grpc.port, 8080)
+        service = try(container.startupProbe.grpc.service, null)
+      } : null
+    } : null
+    livenessProbe = try(container.livenessProbe, null) != null ? {
+      initialDelaySeconds = try(container.livenessProbe.initialDelaySeconds, 0)
+      timeoutSeconds      = try(container.livenessProbe.timeoutSeconds, 1)
+      periodSeconds       = try(container.livenessProbe.periodSeconds, 10)
+      failureThreshold    = try(container.livenessProbe.failureThreshold, 3)
+      httpGet = try(container.livenessProbe.httpGet, null) != null ? {
+        path        = try(container.livenessProbe.httpGet.path, "/")
+        port        = try(container.livenessProbe.httpGet.port, 8080)
+        httpHeaders = try(container.livenessProbe.httpGet.httpHeaders, null)
+      } : null
+      tcpSocket = try(container.livenessProbe.tcpSocket, null) != null ? {
+        port = try(container.livenessProbe.tcpSocket.port, 8080)
+      } : null
+      grpc = try(container.livenessProbe.grpc, null) != null ? {
+        port    = try(container.livenessProbe.grpc.port, 8080)
+        service = try(container.livenessProbe.grpc.service, null)
+      } : null
+    } : null
+    readinessProbe = try(container.readinessProbe, null) != null ? {
+      initialDelaySeconds = try(container.readinessProbe.initialDelaySeconds, 0)
+      timeoutSeconds      = try(container.readinessProbe.timeoutSeconds, 1)
+      periodSeconds       = try(container.readinessProbe.periodSeconds, 10)
+      failureThreshold    = try(container.readinessProbe.failureThreshold, 3)
+      httpGet = try(container.readinessProbe.httpGet, null) != null ? {
+        path        = try(container.readinessProbe.httpGet.path, "/")
+        port        = try(container.readinessProbe.httpGet.port, 8080)
+        httpHeaders = try(container.readinessProbe.httpGet.httpHeaders, null)
+      } : null
+      tcpSocket = try(container.readinessProbe.tcpSocket, null) != null ? {
+        port = try(container.readinessProbe.tcpSocket.port, 8080)
+      } : null
+      grpc = try(container.readinessProbe.grpc, null) != null ? {
+        port    = try(container.readinessProbe.grpc.port, 8080)
+        service = try(container.readinessProbe.grpc.service, null)
+      } : null
+    } : null
+  }}
+
+  # Then normalize module containers
+  module_containers_normalized = { for container in try(var.template.spec.containers, []) : container.name => {
+    name       = container.name
+    image      = try(container.image, null)
+    command    = try(container.command, null)
+    args       = try(container.args, null)
+    workingDir = try(container.workingDir, null)
+    env        = try(container.env, null)
+    resources = try(container.resources, null) != null ? {
+      limits = {
+        cpu    = try(container.resources.limits.cpu, "1000m")
+        memory = try(container.resources.limits.memory, "512Mi")
+      }
+      cpuIdle         = try(container.resources.cpuIdle, true)
+      startupCpuBoost = try(container.resources.startupCpuBoost, false)
     } : null
     ports = try(container.ports, null) != null ? [
       for port in container.ports : {
@@ -58,19 +145,33 @@ locals {
     startupProbe   = try(container.startupProbe, null)
     livenessProbe  = try(container.livenessProbe, null)
     readinessProbe = try(container.readinessProbe, null)
-  } }
+  }}
+
+  # Merge containers: module containers override manifest containers
+  all_containers_normalized = merge(
+    local.manifest_containers_normalized,
+    {
+      for container_name, module_container in local.module_containers_normalized :
+      container_name => merge(
+        try(local.manifest_containers_normalized[container_name], {}),
+        # Only include non-null values from module container
+        {
+          for k, v in module_container : k => v if v != null
+        }
+      )
+    }
+  )
 
   # Get containers from manifest and module
   manifest_containers = try(local.manifest_template.spec.containers, [])
   module_containers   = try(var.template.spec.containers, [])
 
-  # Merge containers by name - module containers override manifest containers
-  # Use normalized containers
-  merged_containers = length(local.module_containers) > 0 ? [
-    for container_name, container in local.normalize_container : container
-    ] : [
-    for container_name, container in local.normalize_container : container
-  ]
+  # Convert the merged containers map back to a list
+  merged_containers = [for container_name, container in local.all_containers_normalized : container]
+
+  # Handle volumes with consistent types
+  manifest_volumes = try([for v in local.manifest_template.spec.volumes : v], [])
+  module_volumes = try(var.template.spec.volumes, [])
 
   # Merge template spec (direct params override manifest)
   merged_template_spec = {
@@ -80,7 +181,21 @@ locals {
     vpcAccess    = try(var.template.spec.vpcAccess, null) != null ? var.template.spec.vpcAccess : try(local.manifest_template.spec.vpcAccess, null)
     nodeSelector = try(var.template.spec.nodeSelector, null) != null ? var.template.spec.nodeSelector : try(local.manifest_template.spec.nodeSelector, null)
 
-    volumes    = coalesce(try(var.template.spec.volumes, null), try(local.manifest_template.spec.volumes, null), [])
+    volumes = length(try(var.template.spec.volumes, [])) > 0 ? var.template.spec.volumes : (
+      try(local.manifest_template.spec.volumes, null) != null ? [for v in local.manifest_template.spec.volumes : {
+        name = v.name
+        secret = try(v.secret, null) != null ? {
+          secretName  = try(v.secret.secretName, "")
+          defaultMode = try(v.secret.defaultMode, 0644)
+          items       = try(v.secret.items, [])
+        } : null
+        cloudSqlInstance = try(v.cloudSqlInstance, null)
+        emptyDir = try(v.emptyDir, null) != null ? {
+          medium    = try(v.emptyDir.medium, "MEMORY")
+          sizeLimit = try(v.emptyDir.sizeLimit, null)
+        } : null
+      }] : []
+    )
     containers = local.merged_containers
   }
 

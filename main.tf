@@ -197,7 +197,7 @@ resource "google_cloud_run_v2_service" "cloudrun_service" {
                 path = http_get.value.path
                 port = http_get.value.port
                 dynamic "http_headers" {
-                  for_each = liveness_probe.value.httpHeaders != null ? liveness_probe.value.httpHeaders : []
+                  for_each = http_get.value.httpHeaders != null ? http_get.value.httpHeaders : []
                   content {
                     name  = http_headers.value.name
                     value = http_headers.value.value
@@ -238,7 +238,7 @@ resource "google_cloud_run_v2_service" "cloudrun_service" {
                 path = http_get.value.path
                 port = http_get.value.port
                 dynamic "http_headers" {
-                  for_each = startup_probe.value.httpHeaders != null ? startup_probe.value.httpHeaders : []
+                  for_each = http_get.value.httpHeaders != null ? http_get.value.httpHeaders : []
                   content {
                     name  = http_headers.value.name
                     value = http_headers.value.value
