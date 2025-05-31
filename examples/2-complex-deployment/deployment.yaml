@@ -13,7 +13,7 @@ spec:
     metadata:
       labels:
         app: complex-app
-        version: v1.0.0
+        version: v1-0-0 # dots are not allowed in labels in GCP
         tier: backend
     spec:
       serviceAccountName: my-service-account@my-gcp-project.iam.gserviceaccount.com
@@ -25,11 +25,12 @@ spec:
       - name: config-volume
         secret:
           secretName: app-config
+          defaultMode: 420
           items:
           - key: config
             version: latest
             path: config.json
-            mode: 0644
+            mode: 420
       containers:
       - name: complex-app
         image: gcr.io/google-samples/hello-app:2.0
@@ -74,10 +75,10 @@ spec:
           httpGet:
             path: /health
             port: 8080
-      - name: nginx-sidecar
+      - name: nginx
         image: nginx:alpine
         ports:
-        - name: nginx
+        - name: http1
           containerPort: 80
         volumeMounts:
         - name: shared-volume
@@ -87,5 +88,6 @@ spec:
             cpu: 500m
             memory: 256Mi
         livenessProbe:
-          tcpSocket:
+          httpGet:
+            path: /
             port: 80

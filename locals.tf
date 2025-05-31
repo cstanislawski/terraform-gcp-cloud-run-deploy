@@ -48,7 +48,7 @@ locals {
       }
       cpuIdle         = try(container.resources.cpuIdle, true)
       startupCpuBoost = try(container.resources.startupCpuBoost, false)
-    } : {
+      } : {
       limits = {
         cpu    = "1000m"
         memory = "512Mi"
@@ -62,7 +62,7 @@ locals {
         containerPort = port.containerPort
       }
     ] : null
-    volumeMounts   = try(container.volumeMounts, null)
+    volumeMounts = try(container.volumeMounts, null)
     startupProbe = try(container.startupProbe, null) != null ? {
       initialDelaySeconds = try(container.startupProbe.initialDelaySeconds, 0)
       timeoutSeconds      = try(container.startupProbe.timeoutSeconds, 1)
@@ -117,7 +117,7 @@ locals {
         service = try(container.readinessProbe.grpc.service, null)
       } : null
     } : null
-  }}
+  } }
 
   # Then normalize module containers
   module_containers_normalized = { for container in try(var.template.spec.containers, []) : container.name => {
@@ -145,7 +145,7 @@ locals {
     startupProbe   = try(container.startupProbe, null)
     livenessProbe  = try(container.livenessProbe, null)
     readinessProbe = try(container.readinessProbe, null)
-  }}
+  } }
 
   # Merge containers: module containers override manifest containers
   all_containers_normalized = merge(
@@ -171,7 +171,7 @@ locals {
 
   # Handle volumes with consistent types
   manifest_volumes = try([for v in local.manifest_template.spec.volumes : v], [])
-  module_volumes = try(var.template.spec.volumes, [])
+  module_volumes   = try(var.template.spec.volumes, [])
 
   # Merge template spec (direct params override manifest)
   merged_template_spec = {
