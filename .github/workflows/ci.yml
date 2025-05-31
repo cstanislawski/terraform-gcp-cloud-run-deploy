@@ -26,6 +26,36 @@ jobs:
     - name: Terraform Validate
       run: terraform validate
 
+  docs-validation:
+    name: Documentation Validation
+    runs-on: ubuntu-latest
+    needs: module-validation
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup terraform-docs
+      uses: terraform-docs/gh-actions@v1.2.0
+      with:
+        working-dir: .
+        output-file: README.md
+        output-method: inject
+        git-push: false
+
+    - name: Check if docs are up-to-date
+      run: |
+        if ! git diff --quiet README.md; then
+          echo "❌ Documentation is out of date!"
+          echo "The following changes need to be applied:"
+          git diff README.md
+          echo ""
+          echo "Please run 'terraform-docs .' and commit the changes."
+          exit 1
+        else
+          echo "✅ Documentation is up-to-date!"
+        fi
+
   examples-validation:
     name: Examples Validation
     runs-on: ubuntu-latest
