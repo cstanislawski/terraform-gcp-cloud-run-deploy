@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: complex-app
+  location: europe-west4
+  project: my-gcp-project
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: complex-app
+  template:
+    metadata:
+      labels:
+        app: complex-app
+        version: v1-0-0 # dots are not allowed in labels in GCP
+        tier: backend
+    spec:
+      serviceAccountName: my-service-account@my-gcp-project.iam.gserviceaccount.com
+      volumes:
+      - name: shared-volume
+        emptyDir:
+          medium: MEMORY
+          sizeLimit: 1Gi
+      - name: config-volume
+        secret:
+          secretName: app-config
+          defaultMode: 420
+          items:
+          - key: config
+            version: latest
+            path: config.json
+            mode: 420
+      containers:
+      - name: complex-app
+        image: gcr.io/google-samples/hello-app:2.0
+        env:
+        - name: ENV
+          value: production
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        ports:
+        - name: http
+          containerPort: 8080
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /tmp
+        - name: config-volume
+          mountPath: /etc/config
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          cpuIdle: false
+          startupCpuBoost: true
+        startupProbe:
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8080
+            httpHeaders:
+            - name: Custom-Header
+              value: startup
+        livenessProbe:
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 30
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8080
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - name: http1
+          containerPort: 80
+        volumeMounts:
+        - name: shared-volume
+          mountPath: /tmp
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
