@@ -3,6 +3,8 @@ module "hello_app_deployment" {
   source = "../../" # while actually using the module, you'd use 'source = "github.com/cstanislawski/terraform-gcp-cloud-run-deploy"'
 
   manifest_path = "./deployment.yaml"
+
+  deletion_protection = false
 }
 
 output "service_uri" {

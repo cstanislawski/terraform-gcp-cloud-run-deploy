@@ -218,3 +218,45 @@ variable "binaryAuthorization" {
   description = "Binary authorization configuration for the Cloud Run service"
   default     = null
 }
+
+variable "deletion_protection" {
+  type        = bool
+  description = "Whether Terraform will be prevented from destroying the service. Defaults to true."
+  default     = true
+}
+
+variable "description" {
+  type        = string
+  description = "User-provided description of the Cloud Run service"
+  default     = null
+}
+
+variable "client" {
+  type        = string
+  description = "Arbitrary identifier for the API client"
+  default     = null
+}
+
+variable "client_version" {
+  type        = string
+  description = "Arbitrary version identifier for the API client"
+  default     = null
+}
+
+variable "launch_stage" {
+  type        = string
+  description = "The launch stage as defined by Google Cloud Platform Launch Stages"
+  default     = null
+  validation {
+    condition = var.launch_stage == null ? true : contains([
+      "UNIMPLEMENTED",
+      "PRELAUNCH",
+      "EARLY_ACCESS",
+      "ALPHA",
+      "BETA",
+      "GA",
+      "DEPRECATED"
+    ], var.launch_stage)
+    error_message = "Launch stage must be one of: UNIMPLEMENTED, PRELAUNCH, EARLY_ACCESS, ALPHA, BETA, GA, DEPRECATED."
+  }
+}

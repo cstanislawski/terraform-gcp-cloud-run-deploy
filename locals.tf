@@ -1,18 +1,18 @@
 # Parse manifest file if provided
 locals {
-  # Load and parse the manifest file
-  manifest_content = var.manifest_path != null ? yamldecode(file(var.manifest_path)) : {}
+  # Load and parse the manifest file if provided (only for K8s-like config)
+  raw_manifest_content = var.manifest_path != null ? yamldecode(file(var.manifest_path)) : null
 
   # Extract values from manifest with proper defaults
-  manifest_metadata = try(local.manifest_content.metadata, {})
-  manifest_spec     = try(local.manifest_content.spec, {})
+  manifest_metadata = try(local.raw_manifest_content.metadata, {})
+  manifest_spec     = try(local.raw_manifest_content.spec, {})
   manifest_template = try(local.manifest_spec.template, {})
 
   # Merge metadata (direct params override manifest)
   merged_metadata = {
-    name     = coalesce(try(var.metadata.name, null), try(local.manifest_metadata.name, null))
-    location = coalesce(try(var.metadata.location, null), try(local.manifest_metadata.location, null))
-    project  = coalesce(try(var.metadata.project, null), try(local.manifest_metadata.project, null))
+    name     = try(var.metadata.name, null) != null ? var.metadata.name : try(local.manifest_metadata.name, null)
+    location = try(var.metadata.location, null) != null ? var.metadata.location : try(local.manifest_metadata.location, null)
+    project  = try(var.metadata.project, null) != null ? var.metadata.project : try(local.manifest_metadata.project, null)
   }
 
   # Merge spec (direct params override manifest)
@@ -26,31 +26,59 @@ locals {
       try(local.manifest_template.metadata.labels, {}),
       try(var.template.metadata.labels, {})
     )
+    annotations = merge(
+      try(local.manifest_template.metadata.annotations, {}),
+      try(var.template.metadata.annotations, {})
+    )
   }
+
+  # Normalize containers to ensure all have expected attributes
+  normalize_container = { for container in concat(
+    try(local.manifest_template.spec.containers, []),
+    try(var.template.spec.containers, [])
+  ) : container.name => {
+    name         = container.name
+    image        = try(container.image, null)
+    command      = try(container.command, null)
+    args         = try(container.args, null)
+    workingDir   = try(container.workingDir, null)
+    env          = try(container.env, null)
+    resources    = try(container.resources, null) != null ? {
+      limits = try(container.resources.limits, {})
+      cpuIdle = try(container.resources.cpuIdle, null)
+      startupCpuBoost = try(container.resources.startupCpuBoost, null)
+    } : null
+    ports           = try(container.ports, null) != null ? [
+      for port in container.ports : {
+        name          = try(port.name, null)
+        containerPort = port.containerPort
+      }
+    ] : null
+    volumeMounts    = try(container.volumeMounts, null)
+    startupProbe    = try(container.startupProbe, null)
+    livenessProbe   = try(container.livenessProbe, null)
+    readinessProbe  = try(container.readinessProbe, null)
+  }}
 
   # Get containers from manifest and module
   manifest_containers = try(local.manifest_template.spec.containers, [])
   module_containers   = try(var.template.spec.containers, [])
 
   # Merge containers by name - module containers override manifest containers
-  # If module containers are provided, merge them with manifest containers by name
-  # If no module containers, use manifest containers as-is
+  # Use normalized containers
   merged_containers = length(local.module_containers) > 0 ? [
-    for manifest_container in local.manifest_containers :
-    contains([for mc in local.module_containers : mc.name], manifest_container.name) ?
-    merge(
-      manifest_container,
-      [for mc in local.module_containers : mc if mc.name == manifest_container.name][0]
-    ) : manifest_container
-  ] : local.manifest_containers
+    for container_name, container in local.normalize_container : container
+  ] : [
+    for container_name, container in local.normalize_container : container
+  ]
 
   # Merge template spec (direct params override manifest)
   merged_template_spec = {
-    serviceAccountName   = coalesce(try(var.template.spec.serviceAccountName, null), try(local.manifest_template.spec.serviceAccountName, null))
+    serviceAccountName   = try(var.template.spec.serviceAccountName, null) != null ? var.template.spec.serviceAccountName : try(local.manifest_template.spec.serviceAccountName, null)
     executionEnvironment = coalesce(try(var.template.spec.executionEnvironment, null), try(local.manifest_template.spec.executionEnvironment, null), "EXECUTION_ENVIRONMENT_GEN2")
 
-    vpcAccess    = coalesce(try(var.template.spec.vpcAccess, null), try(local.manifest_template.spec.vpcAccess, null))
-    nodeSelector = coalesce(try(var.template.spec.nodeSelector, null), try(local.manifest_template.spec.nodeSelector, null))
+    vpcAccess    = try(var.template.spec.vpcAccess, null) != null ? var.template.spec.vpcAccess : try(local.manifest_template.spec.vpcAccess, null)
+    nodeSelector = try(var.template.spec.nodeSelector, null) != null ? var.template.spec.nodeSelector : try(local.manifest_template.spec.nodeSelector, null)
 
     volumes    = coalesce(try(var.template.spec.volumes, null), try(local.manifest_template.spec.volumes, null), [])
     containers = local.merged_containers
@@ -62,28 +90,27 @@ locals {
     spec     = local.merged_template_spec
   }
 
-  # Merge traffic (direct params override manifest)
-  merged_traffic = coalesce(
-    var.traffic,
-    try(local.manifest_content.traffic, null),
-    [{
-      type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
-      percent = 100
-    }]
-  )
+  # Cloud Run specific configuration (only from module variables)
+  # Traffic configuration - normalize to ensure all attributes are present
+  merged_traffic = var.traffic != null ? [
+    for traffic_rule in var.traffic : {
+      type     = try(traffic_rule.type, "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST")
+      revision = try(traffic_rule.revision, null)
+      percent  = try(traffic_rule.percent, 100)
+      tag      = try(traffic_rule.tag, null)
+    }
+  ] : [{
+    type     = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+    revision = null
+    percent  = 100
+    tag      = null
+  }]
 
-  # Merge ingress (direct params override manifest)
-  merged_ingress = coalesce(
-    var.ingress,
-    try(local.manifest_content.ingress, null),
-    "INGRESS_TRAFFIC_ALL"
-  )
+  # Ingress configuration (only from module variables)
+  merged_ingress = coalesce(var.ingress, "INGRESS_TRAFFIC_ALL")
 
-  # Merge binary authorization (direct params override manifest)
-  merged_binary_authorization = coalesce(
-    var.binaryAuthorization,
-    try(local.manifest_content.binaryAuthorization, null)
-  )
+  # Binary authorization (only from module variables)
+  merged_binary_authorization = var.binaryAuthorization
 
   # Validation
   final_metadata = local.merged_metadata.name != null && local.merged_metadata.location != null ? local.merged_metadata : null

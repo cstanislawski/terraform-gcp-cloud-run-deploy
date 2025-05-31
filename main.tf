@@ -3,8 +3,16 @@ resource "google_cloud_run_v2_service" "cloudrun_service" {
   location = local.final_metadata.location
   project  = local.final_metadata.project
 
+  # Additional service parameters
+  deletion_protection = var.deletion_protection
+  description         = var.description
+  client              = var.client
+  client_version      = var.client_version
+  launch_stage        = var.launch_stage
+
   template {
     labels = local.final_template.metadata.labels
+    annotations = local.final_template.metadata.annotations
 
     scaling {
       min_instance_count = local.merged_spec.replicas
