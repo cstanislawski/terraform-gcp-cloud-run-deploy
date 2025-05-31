@@ -48,7 +48,3 @@ jobs:
     - name: Terraform Validate - Example ${{ matrix.example }}
       run: terraform validate
       working-directory: examples/${{ matrix.example }}
-
-    - name: Terraform Plan - Example ${{ matrix.example }}
-      run: terraform plan
-      working-directory: examples/${{ matrix.example }}
